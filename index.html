@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-<title>OI Momentum – Full Strategy (Working Chain)</title>
+<title>OI Momentum – Full Strategy with Live Trade Panel (Broker Style)</title>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 /* ========== YOUR ORIGINAL STYLES (SAME) ========== */
@@ -119,6 +119,7 @@ html,body{background:var(--bg);color:var(--t1);font-family:'Segoe UI',sans-serif
 .trade-mode{display:flex;gap:12px;margin-bottom:12px;font-size:12px;color:var(--t2);}
 .trade-mode label{cursor:pointer;}
 .trade-cfg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.trade-cfg input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--t1);border-radius:4px;padding:6px;}
 .trade-status{padding:8px;text-align:center;font-size:12px;font-weight:700;border-radius:4px;margin-bottom:10px;}
 .trade-status.running{background:rgba(0,220,130,0.15);color:var(--green);}
 .trade-status.stopped{background:rgba(245,54,92,0.1);color:var(--red);}
@@ -143,6 +144,82 @@ html,body{background:var(--bg);color:var(--t1);font-family:'Segoe UI',sans-serif
 .strat-params{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;font-size:11px;}
 .strat-params label{display:flex;align-items:center;gap:5px;color:var(--t2);}
 .strat-params input[type="number"],.strat-params input[type="checkbox"]{background:var(--bg);border:1px solid var(--border);color:var(--t1);border-radius:4px;padding:4px;width:90px;}
+
+/* Active trade panel (broker style) */
+.active-trade-panel {
+  background: rgba(21,28,40,0.95);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 8px 12px;
+  padding: 10px;
+  backdrop-filter: blur(4px);
+}
+.active-trade-panel .title {
+  font-size: 11px;
+  color: var(--t2);
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
+.active-trade-panel .row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.active-trade-panel .label {
+  color: var(--t2);
+}
+.active-trade-panel .value {
+  font-weight: 700;
+  font-family: monospace;
+}
+.active-trade-panel .pnl {
+  font-size: 16px;
+  font-weight: 800;
+}
+.pnl-positive { color: var(--green); }
+.pnl-negative { color: var(--red); }
+.direction-badge {
+  background: var(--green);
+  color: #000;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-block;
+}
+.direction-badge.bear {
+  background: var(--red);
+  color: #fff;
+}
+.closed-trades-list {
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 10px;
+}
+.closed-trade-item {
+  border-bottom: 1px solid rgba(42,53,68,0.4);
+  padding: 6px;
+  margin-bottom: 4px;
+}
+.closed-trade-time { color: var(--green); font-weight: 600; }
+.closed-trade-pnl.positive { color: var(--green); }
+.closed-trade-pnl.negative { color: var(--red); }
+.daily-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.stat-number { font-weight: 700; color: var(--yellow); }
+.enable-sl-tp {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 11px;
+}
+
 @media(min-width:768px){
   .dash{flex-direction:row;align-items:flex-start;padding:14px;}
   .side-col{width:260px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;}
@@ -279,8 +356,15 @@ html,body{background:var(--bg);color:var(--t1);font-family:'Segoe UI',sans-serif
       <div class="sig-log-body" id="sigLogBody"></div>
     </div>
 
+    <!-- TRADING BOT CARD -->
     <div class="trade-card">
       <div class="trade-hdr" onclick="toggleTrade()">Trading Bot <span id="tradeToggle">▼</span></div>
+      
+      <!-- ACTIVE TRADE PANEL (broker style, always visible) -->
+      <div id="activeTradePanel" style="margin:0 12px 8px 12px;">
+        <!-- Will be filled by JS -->
+      </div>
+      
       <div class="trade-body" id="tradeBody">
         <div class="trade-mode">
           <label><input type="radio" name="tradeMode" value="paper" checked onchange="setTradeMode()"> Paper</label>
@@ -291,10 +375,34 @@ html,body{background:var(--bg);color:var(--t1);font-family:'Segoe UI',sans-serif
           <div><label for="tradeSL">SL %</label><input type="number" id="tradeSL" value="0.8" step="0.1"></div>
           <div><label for="tradeTP">TP %</label><input type="number" id="tradeTP" value="2.2" step="0.1"></div>
         </div>
+        <div class="enable-sl-tp">
+          <label><input type="checkbox" id="enableSL" checked> Enable SL</label>
+          <label><input type="checkbox" id="enableTP" checked> Enable TP</label>
+        </div>
         <div style="margin-bottom:10px;font-size:11px;">
           <label><input type="checkbox" id="conf2x" checked onchange="toggleConf2x()"> 2‑consecutive confirmation</label>
         </div>
         <div class="strat-params" id="stratParams"></div>
+        
+        <!-- Daily Stats Panel -->
+        <div class="daily-stats-panel" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;">
+          <div class="panel-title" style="font-size:11px;font-weight:700;margin-bottom:6px;">📊 Today's Stats</div>
+          <div class="daily-stats-grid" id="dailyStatsGrid">
+            <div>Trades: <span id="dailyTradeCount">0</span></div>
+            <div>Net P&L: <span id="dailyNetPL" class="stat-number">₹0</span></div>
+            <div>Wins: <span id="dailyWins">0</span></div>
+            <div>Losses: <span id="dailyLosses">0</span></div>
+            <div>Win Rate: <span id="dailyWinRate">0%</span></div>
+            <div>Total P&L: <span id="dailyTotalPL">₹0</span></div>
+          </div>
+        </div>
+        
+        <!-- Closed Trades Panel -->
+        <div class="closed-trades-panel" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;">
+          <div class="panel-title" style="font-size:11px;font-weight:700;margin-bottom:6px;">📋 Closed Trades</div>
+          <div id="closedTradesList" class="closed-trades-list">No closed trades yet.</div>
+        </div>
+        
         <div class="trade-status stopped" id="tradeStatus">Stopped</div>
         <button class="start" id="tradeBtn" onclick="toggleTradeBot()">Start Bot</button>
         <div id="tradeLog"></div>
@@ -316,7 +424,7 @@ html,body{background:var(--bg);color:var(--t1);font-family:'Segoe UI',sans-serif
 <script>
 'use strict';
 
-// ---------- YOUR ORIGINAL SYM_LIST (exact same) ----------
+// ---------- SYM_LIST (same as original) ----------
 var SYM_LIST = [
   {g:'Index', v:'NSE_INDEX|Nifty 50', n:'NIFTY 50'},
   {g:'Index', v:'NSE_INDEX|Nifty Bank', n:'BANKNIFTY'},
@@ -428,7 +536,7 @@ var SYM_LIST = [
   {g:'F&O', v:'NSE_EQ|INE010D01021', n:'ZYDUSLIFE'}
 ];
 
-// ---------- GLOBALS (YOUR ORIGINAL + ADDED STRATEGY PARAMS) ----------
+// ---------- GLOBALS ----------
 var tok = '', chart = null, cSeries = null, cData = [];
 var curIK = 'NSE_INDEX|Nifty 50', curTF = '5minute';
 var emaList = [], emaId = 0, modalId = null, modalColor = '#fbbf24';
@@ -447,8 +555,9 @@ var reversalAlert = '', prevReversalAlert = '';
 var prevChainSpot = 0, prevChainPCR = 0, currentRawSig = '';
 var spotHistory = [];
 var dailyATR = 0, atrCalculated = false;
+var closedTrades = [];
+var dailyStats = { trades:0, wins:0, losses:0, totalPL:0 };
 
-// Strategy parameters with toggle switches
 var stratParams = {
   buildupThresh: 1000000,
   coveringThresh: 800000,
@@ -486,7 +595,7 @@ var TF = {
 
 function $(id) { return document.getElementById(id); }
 
-// ---------- HELPER FUNCTIONS (YOUR ORIGINAL + NEW STRATEGY HELPERS) ----------
+// ---------- HELPERS ----------
 function getISTNow() {
   var now = new Date();
   var istMs = now.getTime() + (5.5 * 3600000);
@@ -501,7 +610,12 @@ function getCurrentDateStr() {
 }
 function resetDailyTrades() {
   var today = getCurrentDateStr();
-  if (lastTradeDate !== today) { todaysTrades = 0; lastTradeDate = today; }
+  if (lastTradeDate !== today) {
+    todaysTrades = 0;
+    lastTradeDate = today;
+    dailyStats = { trades:0, wins:0, losses:0, totalPL:0 };
+    updateDailyStatsUI();
+  }
 }
 function isBeforeCutoff() {
   var now = getISTNow();
@@ -573,7 +687,7 @@ function generateRawSignal(netCall, netPut, totalWrite, spotPrice) {
   return 'SIDEWAYS';
 }
 
-// ---------- PROCESS CHAIN (YOUR ORIGINAL LOGIC, BUT WITH NEW SIGNAL GENERATION) ----------
+// ---------- PROCESS CHAIN ----------
 function processChain(data) {
   var cOI=0,pOI=0,cB=0,pB=0,cU=0,pU=0,spot=0;
   data.forEach(function(d){
@@ -595,7 +709,6 @@ function processChain(data) {
   
   updateSpotHistory(spot);
   
-  // APPLY FILTERS (if enabled)
   var sidewaysFormula = isSidewaysByFormula(netCall, netPut);
   if (stratParams.enableSidewaysFilter && sidewaysFormula) {
     addTradeLog("Sideways filter blocked trade", 0);
@@ -613,7 +726,6 @@ function processChain(data) {
   var rawSig = generateRawSignal(netCall, netPut, totalWrite, spot);
   currentRawSig = rawSig;
   
-  // 2-consecutive confirmation
   if (rawSig === prevSignal) signalCount++; else signalCount = 1;
   prevSignal = rawSig;
   var newSig = rawSig;
@@ -644,6 +756,8 @@ function processChain(data) {
   
   updateOIBoxes(cOI, pOI, netCall, netPut, pcr, spot);
   renderChainTable(data, spot);
+  updateActiveTradeDisplay();
+  updateDailyStatsUI();
 }
 
 function updateOIBoxes(cOI, pOI, netCall, netPut, pcr, spot) {
@@ -664,7 +778,6 @@ function renderChainTable(data, spot) {
     var isATM = d.strike_price===atm;
     var ceBuild = Math.max(0,(ce.oi||0)-(ce.prev_oi||0)), peBuild = Math.max(0,(pe.oi||0)-(pe.prev_oi||0));
     var act = (pe.oi||0)>(ce.oi||0)?'<span class="sb">CE</span>':'<span class="ss">PE</span>';
-    // FIXED: removed the stray dot before the plus operator
     html += '<tr class="' + (isATM ? 'atm' : '') + '">' +
             '<td>' + d.strike_price + (isATM ? ' <span style="color:var(--yellow);font-size:9px;">ATM</span>' : '') + '</td>' +
             '<td class="cr">' + (ce.ltp || '--') + '</td>' +
@@ -697,7 +810,7 @@ function updateUIForSignal(sig, netCall, netPut, pcr, spot) {
   $('mSpot').textContent = spot.toFixed(2);
 }
 
-// ---------- TRADE ENTRY/EXIT WITH ALL NEW RULES ----------
+// ---------- TRADE FUNCTIONS ----------
 function checkTradeEntry(signal, spot) {
   if (!tradeRunning) return;
   resetDailyTrades();
@@ -711,18 +824,23 @@ function checkTradeEntry(signal, spot) {
   }
   if (tradeEntry && tradeEntry.signal) return;
   var qty = parseInt($('tradeQty').value) || 1;
+  var now = new Date();
+  var entryTimeStr = now.toLocaleString('en-IN', {timeZone:'Asia/Kolkata', hour12:false});
   tradeEntry = {
     signal: signal,
     entry: spot,
     qty: qty,
     entryMs: Date.now(),
+    entryTime: entryTimeStr,
     highWaterMark: spot,
     lowWaterMark: spot,
     breakevenTriggered: false,
-    stopPrice: null
+    stopPrice: null,
+    symbol: $('symSearch').value
   };
   addTradeLog(`Entry ${signal==='BULL'?'BUY CE':'BUY PE'} @ ${spot.toFixed(2)} | Qty: ${qty}`, 0);
   todaysTrades++;
+  updateActiveTradeDisplay();
 }
 
 function checkTradeExit(currentSpot) {
@@ -730,40 +848,188 @@ function checkTradeExit(currentSpot) {
   var pnl = (tradeEntry.signal === 'BULL') ? currentSpot - tradeEntry.entry : tradeEntry.entry - currentSpot;
   var pnlPct = (pnl / tradeEntry.entry) * 100;
   var pnlRupees = pnl * tradeEntry.qty;
+  var exitReason = '';
+  var exitNow = false;
+  
   if (stratParams.enableMaxLossFilter && pnlRupees <= -stratParams.maxLossRupees) {
-    exitTrade(`Hard Max Loss ₹${stratParams.maxLossRupees} hit`, pnlPct, pnlRupees);
-    return;
+    exitReason = `Hard Max Loss ₹${stratParams.maxLossRupees} hit`;
+    exitNow = true;
   }
-  if (currentRawSig !== 'SIDEWAYS' && currentRawSig !== tradeEntry.signal) {
-    exitTrade(`OI Flip: ${tradeEntry.signal}→${currentRawSig}`, pnlPct, pnlRupees);
-    return;
+  else if (currentRawSig !== 'SIDEWAYS' && currentRawSig !== tradeEntry.signal) {
+    exitReason = `OI Flip: ${tradeEntry.signal}→${currentRawSig}`;
+    exitNow = true;
   }
-  var slPct = parseFloat($('tradeSL').value) || stratParams.slPercent;
-  var tpPct = parseFloat($('tradeTP').value) || stratParams.tpPercent;
-  if (pnlPct <= -slPct) { exitTrade(`SL ${slPct}% hit`, pnlPct, pnlRupees); return; }
-  if (pnlPct >= tpPct) { exitTrade(`TP ${tpPct}% hit`, pnlPct, pnlRupees); return; }
-  var profitRupees = pnl * tradeEntry.qty;
-  if (!tradeEntry.breakevenTriggered && profitRupees >= stratParams.trailTriggerRupees) {
-    tradeEntry.breakevenTriggered = true;
-    tradeEntry.stopPrice = tradeEntry.signal === 'BULL' ? tradeEntry.entry + stratParams.trailBufferPoints : tradeEntry.entry - stratParams.trailBufferPoints;
-    addTradeLog(`Breakeven trail activated | Stop @ ${tradeEntry.stopPrice.toFixed(2)}`, 0);
-  }
-  if (tradeEntry.breakevenTriggered && tradeEntry.stopPrice) {
-    if ((tradeEntry.signal === 'BULL' && currentSpot <= tradeEntry.stopPrice) ||
-        (tradeEntry.signal === 'BEAR' && currentSpot >= tradeEntry.stopPrice)) {
-      exitTrade(`Breakeven trail hit`, pnlPct, pnlRupees);
-      return;
+  else if (document.getElementById('enableSL').checked) {
+    var slPct = parseFloat($('tradeSL').value) || stratParams.slPercent;
+    if (pnlPct <= -slPct) {
+      exitReason = `SL ${slPct}% hit`;
+      exitNow = true;
     }
   }
-  var ist = getISTNow();
-  if (ist.total >= 15*60+25) { exitTrade(`EOD market close`, pnlPct, pnlRupees); return; }
+  if (!exitNow && document.getElementById('enableTP').checked) {
+    var tpPct = parseFloat($('tradeTP').value) || stratParams.tpPercent;
+    if (pnlPct >= tpPct) {
+      exitReason = `TP ${tpPct}% hit`;
+      exitNow = true;
+    }
+  }
+  if (!exitNow) {
+    var profitRupees = pnl * tradeEntry.qty;
+    if (!tradeEntry.breakevenTriggered && profitRupees >= stratParams.trailTriggerRupees) {
+      tradeEntry.breakevenTriggered = true;
+      tradeEntry.stopPrice = tradeEntry.signal === 'BULL' ? tradeEntry.entry + stratParams.trailBufferPoints : tradeEntry.entry - stratParams.trailBufferPoints;
+      addTradeLog(`Breakeven trail activated | Stop @ ${tradeEntry.stopPrice.toFixed(2)}`, 0);
+    }
+    if (tradeEntry.breakevenTriggered && tradeEntry.stopPrice) {
+      if ((tradeEntry.signal === 'BULL' && currentSpot <= tradeEntry.stopPrice) ||
+          (tradeEntry.signal === 'BEAR' && currentSpot >= tradeEntry.stopPrice)) {
+        exitReason = `Breakeven trail hit`;
+        exitNow = true;
+      }
+    }
+  }
+  if (!exitNow) {
+    var ist = getISTNow();
+    if (ist.total >= 15*60+25) {
+      exitReason = `EOD market close`;
+      exitNow = true;
+    }
+  }
+  
+  if (exitNow) {
+    exitTrade(exitReason, pnlPct, pnlRupees, currentSpot);
+  } else {
+    updateActiveTradeDisplay();
+  }
 }
 
-function exitTrade(reason, pnlPct, pnlRupees) {
-  var exitPrice = (tradeEntry.signal==='BULL' ? parseFloat($('spotV').textContent) : tradeEntry.entry - (pnlPct/100)*tradeEntry.entry);
-  addTradeLog(`${reason} @ ${exitPrice.toFixed(2)} | P&L: ${pnlPct.toFixed(2)}% (₹${pnlRupees.toFixed(2)})`, pnlPct);
+function exitTrade(reason, pnlPct, pnlRupees, exitSpot) {
+  var now = new Date();
+  var exitTimeStr = now.toLocaleString('en-IN', {timeZone:'Asia/Kolkata', hour12:false});
+  var closed = {
+    entryTime: tradeEntry.entryTime,
+    exitTime: exitTimeStr,
+    symbol: tradeEntry.symbol || $('symSearch').value,
+    direction: tradeEntry.signal === 'BULL' ? 'BUY CE' : 'BUY PE',
+    entryPrice: tradeEntry.entry,
+    exitPrice: exitSpot,
+    qty: tradeEntry.qty,
+    pnlPercent: pnlPct,
+    pnlRupees: pnlRupees,
+    reason: reason
+  };
+  closedTrades.unshift(closed);
+  if (closedTrades.length > 50) closedTrades.pop();
+  saveClosedTrades();
+  renderClosedTrades();
+  
+  dailyStats.trades++;
+  if (pnlRupees > 0) { dailyStats.wins++; dailyStats.totalPL += pnlRupees; }
+  else { dailyStats.losses++; dailyStats.totalPL += pnlRupees; }
+  updateDailyStatsUI();
+  
+  addTradeLog(`${reason} @ ${exitSpot.toFixed(2)} | P&L: ${pnlPct.toFixed(2)}% (₹${pnlRupees.toFixed(2)})`, pnlPct);
+  
   if (pnlPct > 0) totalProfit += pnlPct; else totalLoss += Math.abs(pnlPct);
-  totalTrades++; updateTradeStats(); tradeEntry = {}; saveTradeState();
+  totalTrades++;
+  updateTradeStats();
+  
+  tradeEntry = {};
+  saveTradeState();
+  updateActiveTradeDisplay();
+}
+
+function updateActiveTradeDisplay() {
+  var container = $('activeTradePanel');
+  if (!tradeEntry || !tradeEntry.signal) {
+    container.innerHTML = '';
+    return;
+  }
+  var currentSpot = parseFloat($('spotV').textContent) || tradeEntry.entry;
+  var pnl = (tradeEntry.signal === 'BULL') ? currentSpot - tradeEntry.entry : tradeEntry.entry - currentSpot;
+  var pnlPct = (pnl / tradeEntry.entry) * 100;
+  var pnlRupees = pnl * tradeEntry.qty;
+  var elapsed = Math.floor((Date.now() - tradeEntry.entryMs) / 60000);
+  var directionClass = tradeEntry.signal === 'BULL' ? 'direction-badge' : 'direction-badge bear';
+  var pnlClass = pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
+  var html = `
+    <div class="active-trade-panel">
+      <div class="title">ACTIVE TRADE</div>
+      <div class="row">
+        <span class="label">Symbol</span>
+        <span class="value">${tradeEntry.symbol || $('symSearch').value}</span>
+      </div>
+      <div class="row">
+        <span class="label">Direction</span>
+        <span class="${directionClass}">${tradeEntry.signal === 'BULL' ? 'BUY CE' : 'BUY PE'}</span>
+      </div>
+      <div class="row">
+        <span class="label">Entry</span>
+        <span class="value">${tradeEntry.entry.toFixed(2)} @ ${tradeEntry.entryTime}</span>
+      </div>
+      <div class="row">
+        <span class="label">Current</span>
+        <span class="value">${currentSpot.toFixed(2)}</span>
+      </div>
+      <div class="row">
+        <span class="label">Qty</span>
+        <span class="value">${tradeEntry.qty}</span>
+      </div>
+      <div class="row">
+        <span class="label">Unrealized P&L</span>
+        <span class="value pnl ${pnlClass}">${pnl>=0?'+':''}${pnl.toFixed(2)} pts (${pnlPct.toFixed(2)}%) → ₹${pnlRupees.toFixed(2)}</span>
+      </div>
+      <div class="row">
+        <span class="label">Running Time</span>
+        <span class="value">${elapsed} min</span>
+      </div>
+    </div>
+  `;
+  container.innerHTML = html;
+}
+
+function renderClosedTrades() {
+  var container = $('closedTradesList');
+  if (!closedTrades.length) {
+    container.innerHTML = 'No closed trades yet.';
+    return;
+  }
+  var html = '';
+  closedTrades.forEach(t => {
+    var pnlClass = t.pnlRupees >= 0 ? 'positive' : 'negative';
+    html += `<div class="closed-trade-item">
+      <div><span class="closed-trade-time">${t.entryTime}</span> → <span class="closed-trade-time">${t.exitTime}</span></div>
+      <div>${t.symbol} | ${t.direction} | Qty:${t.qty}</div>
+      <div>Entry: ${t.entryPrice.toFixed(2)} | Exit: ${t.exitPrice.toFixed(2)}</div>
+      <div>P&L: <span class="closed-trade-pnl ${pnlClass}">${t.pnlPercent.toFixed(2)}% (₹${t.pnlRupees.toFixed(2)})</span> | ${t.reason}</div>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function updateDailyStatsUI() {
+  $('dailyTradeCount').textContent = dailyStats.trades;
+  var netPL = dailyStats.totalPL;
+  $('dailyNetPL').textContent = '₹' + netPL.toFixed(2);
+  $('dailyNetPL').style.color = netPL >= 0 ? 'var(--green)' : 'var(--red)';
+  $('dailyWins').textContent = dailyStats.wins;
+  $('dailyLosses').textContent = dailyStats.losses;
+  var winRate = dailyStats.trades > 0 ? (dailyStats.wins / dailyStats.trades * 100).toFixed(1) : 0;
+  $('dailyWinRate').textContent = winRate + '%';
+  $('dailyTotalPL').textContent = '₹' + netPL.toFixed(2);
+}
+
+function saveClosedTrades() {
+  try { localStorage.setItem('closed_trades', JSON.stringify(closedTrades)); } catch(e) {}
+}
+function loadClosedTrades() {
+  try { var raw = localStorage.getItem('closed_trades'); if (raw) closedTrades = JSON.parse(raw); renderClosedTrades(); } catch(e) {}
+}
+function saveDailyStats() {
+  try { localStorage.setItem('daily_stats', JSON.stringify(dailyStats)); } catch(e) {}
+}
+function loadDailyStats() {
+  try { var raw = localStorage.getItem('daily_stats'); if (raw) dailyStats = JSON.parse(raw); updateDailyStatsUI(); } catch(e) {}
 }
 
 function addTradeLog(msg, pnlPct) {
@@ -865,7 +1131,7 @@ function addChartSignal(signal,price,time){
   var marker={time,position:signal==='BULL'?'belowBar':'aboveBar',color:signal==='BULL'?'#00dc82':'#f5365c',shape:signal==='BULL'?'arrowUp':'arrowDown',text:signal==='BULL'?'CE':'PE'};
   signalMarkers.push(marker);cSeries.setMarkers(signalMarkers.slice(-10));
 }
-// EMA functions (your original ones)
+// EMA functions
 function calcEMA(data,per,src){ src=src||'close'; if(!data||data.length<per)return[]; var k=2/(per+1),res=[],sum=0; for(var i=0;i<per;i++)sum+=(data[i][src]||data[i].close); var prev=sum/per; res.push({time:data[per-1].time,value:prev}); for(var i=per;i<data.length;i++){ var val=data[i][src]||data[i].close; prev=val*k+prev*(1-k); res.push({time:data[i].time,value:prev}); } return res; }
 function redrawEMAs(){ emaList.forEach(e=>drawEMA(e)); renderLegend(); }
 function drawEMA(e){ if(!chart)return; if(e.s){try{chart.removeSeries(e.s);}catch(x){}e.s=null;} if(cData.length<e.per)return; var ed=calcEMA(cData,e.per,e.src); if(!ed.length)return; e.s=chart.addLineSeries({color:e.color,lineWidth:e.wid,priceLineVisible:false}); e.s.setData(ed); }
@@ -883,7 +1149,7 @@ function toHexColor(c){ if(!c)return'#ffffff'; if(c.startsWith('#'))return c.len
 function rgbToHex(rgb){ var m=rgb.match(/\d+/g); if(!m||m.length<3)return null; return'#'+m.slice(0,3).map(x=>(+x).toString(16).padStart(2,'0')).join(''); }
 function saveEMAState(){ try{ var data=emaList.map(e=>({id:e.id,per:e.per,src:e.src,color:e.color,wid:e.wid})); localStorage.setItem('ema_list',JSON.stringify(data)); localStorage.setItem('ema_id_counter',String(emaId)); }catch(x){} }
 function loadEMAState(){ try{ var raw=localStorage.getItem('ema_list'); var idRaw=localStorage.getItem('ema_id_counter'); if(idRaw)emaId=parseInt(idRaw)||0; if(!raw)return; var data=JSON.parse(raw); emaList=data.map(e=>({id:e.id,per:e.per,src:e.src,color:e.color,wid:e.wid,s:null})); }catch(x){emaList=[];} }
-// Indicator stubs (your original)
+// Indicator stubs
 var indState={ support:{on:false,series:[],levels:[]}, resistance:{on:false,series:[],levels:[]}, maxpain:{on:false,series:[],value:0}, maxoi:{on:false,series:[],value:0} };
 function toggleIndicator(name){ var ind=indState[name]; if(!ind)return; ind.on=!ind.on; var chk=document.getElementById('chk-'+name); if(chk){chk.textContent=ind.on?'●':'○';chk.className='ip-chk'+(ind.on?' on':'');} if(ind.on)drawIndicator(name); else removeIndicatorSeries(name); closeInd(); }
 function removeIndicatorSeries(name){ var ind=indState[name]; if(!ind||!ind.series)return; ind.series.forEach(function(s){try{chart.removeSeries(s);}catch(e){}}); ind.series=[]; }
@@ -924,7 +1190,6 @@ function selectSym(val, name) {
   if($('revBar')) $('revBar').style.display = 'none';
   loadExpiries(); loadCandles(curIK, curTF, false);
 }
-// Live update (async fixed)
 async function liveUpdate() {
   if(!curIK)return; var cfg=TF[curTF]; if(!cfg||!cfg.intra)return;
   try{
@@ -952,6 +1217,7 @@ async function liveUpdate() {
     $('barInfo').textContent=cData.length+' bars · '+last.close.toFixed(2);$('cTime').textContent=fmtIST(last.time);
     emaList.forEach(function(e){var ev=document.getElementById('ev'+e.id);if(ev&&cData.length>=e.per){var ed=calcEMA(cData,e.per,e.src);if(ed.length){ev.textContent=ed[ed.length-1].value.toFixed(2);if(e.s){try{e.s.update(ed[ed.length-1]);}catch(x){try{e.s.setData(ed);}catch(y){}}}}}});
     if(tradeRunning && tradeEntry && tradeEntry.signal) checkTradeExit(last.close);
+    else if (tradeRunning) updateActiveTradeDisplay();
   }catch(e){console.log('liveUpdate:',e.message);}
 }
 // UI functions
@@ -970,7 +1236,7 @@ function saveTradeState(){ try{ localStorage.setItem('trade_state',JSON.stringif
 function loadTradeState(){ try{ var raw=localStorage.getItem('trade_state'); if(raw){ var s=JSON.parse(raw); tradeMode=s.tradeMode||'paper'; tradeRunning=s.tradeRunning||false; tradeEntry=s.tradeEntry||{}; tradeLog=s.tradeLog||[]; totalProfit=s.totalProfit||0; totalLoss=s.totalLoss||0; totalTrades=s.totalTrades||0; lastTradeDate=s.lastTradeDate||''; todaysTrades=s.todaysTrades||0; if(tradeRunning){ $('tradeBtn').textContent='Stop Bot'; $('tradeBtn').className='stop'; $('tradeStatus').textContent='Running ('+tradeMode+')'; $('tradeStatus').className='trade-status running'; } $('tradeQty').value=(tradeEntry&&tradeEntry.qty)||1; document.querySelectorAll('input[name="tradeMode"]').forEach(r=>{if(r.value===tradeMode)r.checked=true;}); renderTradeLog(); updateTradeStats(); } } catch(x){} }
 function updateTradeStats(){ var pl=totalProfit-totalLoss; var plEl=$('tradePL'); if(plEl){ plEl.textContent='₹'+pl.toFixed(2); plEl.style.color=pl>=0?'var(--green)':'var(--red)'; } var countEl=$('tradeCount'); if(countEl) countEl.textContent=totalTrades; var wrEl=$('tradeWinRate'); if(wrEl && totalTrades>0) wrEl.textContent=Math.round((totalProfit>totalLoss?totalProfit/(totalProfit+totalLoss)*100:0))+'%'; }
 function renderTradeLog(){ var html=tradeLog.slice().reverse().map(t=>'<div style="padding:3px 0;border-bottom:1px solid rgba(42,53,68,0.3);">['+t.time+'] '+t.msg+'</div>').join(''); $('tradeLog').innerHTML=html; }
-function toggleTradeBot(){ if(tradeRunning){ tradeRunning=false; $('tradeBtn').textContent='Start Bot'; $('tradeBtn').className='start'; $('tradeStatus').textContent='Stopped'; $('tradeStatus').className='trade-status stopped'; tradeEntry={}; addTradeLog('Bot stopped',0); } else{ tradeRunning=true; $('tradeBtn').textContent='Stop Bot'; $('tradeBtn').className='stop'; var ist=getISTNow(), marketOpen=9*60+15, marketClose=15*60+25, inMkt=ist.total>=marketOpen&&ist.total<=marketClose; $('tradeStatus').textContent='Running ('+tradeMode+')'+(inMkt?' 🟢 Market Open':' 🔴 Market Closed'); $('tradeStatus').className='trade-status running'; addTradeLog('Bot started ['+tradeMode+'] | Market: '+(inMkt?'OPEN':'CLOSED'),0); if(window._botStatusTimer)clearInterval(window._botStatusTimer); window._botStatusTimer=setInterval(function(){ if(!tradeRunning){clearInterval(window._botStatusTimer);return;} var t=getISTNow(); var inM=t.total>=marketOpen&&t.total<=marketClose; $('tradeStatus').textContent='Running ('+tradeMode+')'+(inM?' 🟢 Market Open':' 🔴 Market Closed'); },30000); } }
+function toggleTradeBot(){ if(tradeRunning){ tradeRunning=false; $('tradeBtn').textContent='Start Bot'; $('tradeBtn').className='start'; $('tradeStatus').textContent='Stopped'; $('tradeStatus').className='trade-status stopped'; tradeEntry={}; addTradeLog('Bot stopped',0); updateActiveTradeDisplay(); } else{ tradeRunning=true; $('tradeBtn').textContent='Stop Bot'; $('tradeBtn').className='stop'; var ist=getISTNow(), marketOpen=9*60+15, marketClose=15*60+25, inMkt=ist.total>=marketOpen&&ist.total<=marketClose; $('tradeStatus').textContent='Running ('+tradeMode+')'+(inMkt?' 🟢 Market Open':' 🔴 Market Closed'); $('tradeStatus').className='trade-status running'; addTradeLog('Bot started ['+tradeMode+'] | Market: '+(inMkt?'OPEN':'CLOSED'),0); if(window._botStatusTimer)clearInterval(window._botStatusTimer); window._botStatusTimer=setInterval(function(){ if(!tradeRunning){clearInterval(window._botStatusTimer);return;} var t=getISTNow(); var inM=t.total>=marketOpen&&t.total<=marketClose; $('tradeStatus').textContent='Running ('+tradeMode+')'+(inM?' 🟢 Market Open':' 🔴 Market Closed'); },30000); } }
 function setTradeMode(){ tradeMode=document.querySelector('input[name="tradeMode"]:checked').value; }
 function toggleConf2x(){ var chk=$('conf2x'); require2Consecutive=chk.checked; try{localStorage.setItem('conf2x',require2Consecutive?'1':'0');}catch(e){} addTradeLog('2-Consecutive: '+(require2Consecutive?'ON':'OFF'),0); }
 function toggleTrade(){ var body=$('tradeBody'); body.classList.toggle('open'); $('tradeToggle').textContent=body.classList.contains('open')?'▲':'▼'; }
@@ -985,7 +1251,6 @@ function showLoad(v){ var e=$('loadMsg'); if(e)e.style.display=v?'flex':'none'; 
 async function go(url){ var r=await fetch(url,{headers:{'Accept':'application/json','Authorization':'Bearer '+tok}}); if(r.status===401){ alert('Token expired! Please regenerate at https://developers.upstox.io/'); doLogout(); throw new Error('401'); } if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
 var PAL = ['#fbbf24','#3b82f6','#00dc82','#f5365c','#a855f7','#f97316','#06b6d4','#ec4899','#84cc16','#14b8a6'];
 
-// ---------- RENDER STRATEGY PARAMETERS (SAFE STRING CONCATENATION) ----------
 function renderStrategyParams() {
   var container = $('stratParams');
   if (!container) return;
@@ -1040,6 +1305,7 @@ function renderStrategyParams() {
 window.onload=function(){
   var t=localStorage.getItem('up_tok'); if(t){tok=t;$('accessToken').value=t;showDash();}
   loadSignalLog(); renderSigLog(); loadTradeState(); updateTradeStats();
+  loadClosedTrades(); loadDailyStats();
   try{var c2=localStorage.getItem('conf2x'); if(c2!==null){require2Consecutive=c2==='1';$('conf2x').checked=require2Consecutive;}}catch(e){}
 };
 document.addEventListener('click',function(e){var p=$('indPanel'),btn=$('indToggle');if(p&&p.style.display==='block'&&!p.contains(e.target)&&e.target!=btn)closeInd();var m=$('emaModal');if(m&&m.classList.contains('open')&&e.target===m)closeModal();});
